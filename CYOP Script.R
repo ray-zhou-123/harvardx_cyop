@@ -12,7 +12,7 @@ library(class)
 library(lubridate)
 
 # Download data
-if(!file.exists(traffic.csv)){
+if(!file.exists("traffic.csv")){
   download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/00492/Metro_Interstate_Traffic_Volume.csv.gz", "traffic.csv.gz")
   gunzip("traffic.csv.gz")
 }
