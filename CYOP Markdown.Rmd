@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo=TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 
 ## Introduction
 
-Consistent traffic flow is critical for the physical and economical well being of commuters, travelers, and businesses. Accurate metrics of this can be employed by government agencies to improve safety and efficiency in transportation networks. Traffic congestion incurs an opportunity cost among individuals who would otherwise be working; not to mention, it also increases vehicular emissions and degrades the environment. Traffic flow is subject to a variety of factors, including inclement weather, time of day, and the particular day of the year. Using machine learning techniques, we will predict traffic flow using a variety of factors.
+Consistent traffic flow is critical for the physical and economical well-being of commuters, travelers, and businesses. Accurate metrics of this can be employed by government agencies to improve safety and efficiency in transportation networks. Traffic congestion incurs an opportunity cost among individuals who would otherwise be working; not to mention, it also increases vehicular emissions and degrades the environment. Traffic flow is subject to a variety of factors, including inclement weather, time of day, and the particular day of the year. Using machine learning techniques, we will predict traffic flow using a variety of factors.
 
 The data used in this report is the [Metro Interstate Traffic Volume Data Set](http://archive.ics.uci.edu/ml/datasets/Metro+Interstate+Traffic+Volume) from the UCI Machine Learning Repository. It contains 48,204 data points on hourly traffic from Minneapolis to St. Paul, MN on westbound I-94, including weather and holiday features, from 2012-2018. Factors/variables in the dataset include:
 
@@ -37,7 +37,7 @@ The data used in this report is the [Metro Interstate Traffic Volume Data Set](h
 9. Traffic Volume
   + numerical variable, number of cars
 
-The goal of this project is apply several classification models to the traffic data and evaluate their effectiveness using k-fold cross validation given a training and testing set. We will first perform exploratory data analysis, and clean the data. We will normalize the data, and then conduct machine learning algorithms, determining which technique is most accurate. Supervised machine learning algorithms that will be used for this classification problem include:
+The goal of this project is to apply several classification models to the traffic data and evaluate their effectiveness using k-fold cross validation given a training and testing set. We will first perform exploratory data analysis, and then clean the data. We will normalize the data, and then conduct machine learning algorithms, determining which technique is most accurate. Supervised machine learning algorithms that will be used for this classification problem include:
 
 1. K Nearest Neighbors
 2. Decision Tree
@@ -83,7 +83,7 @@ nrow(df)
 head(df)
 ```
 
-We can see the 9 columns, and 48204 total entries.
+We can see the 9 columns and 48204 total entries.
 
 ### Exploratory Data Analysis and Data Cleaning
 
@@ -169,7 +169,8 @@ We can also examine the month to month variation.
 ```{r}
 ggplot(df2, aes(x=as.factor(month), y=traffic_volume)) + labs(title="Month vs Traffic Volume", x="Month", y="Traffic Volume") + geom_boxplot()
 ```
-While there is some variation in traffic volume, the means and IQRs are too similar to suggest significant variation of traffic flow based on month. Let's leave this as is for now.
+
+While there is some variation in traffic volume, the means and IQRs are too similar to suggest a significant variation of traffic flow based on the month. Let's leave this as-is for now.
 
 We can also analyze the traffic flow with respect to the day of the month.
 ```{r}
@@ -183,7 +184,7 @@ It seems most likely that the traffic flow will change most with the hour of the
 ggplot(df2, aes(x=as.factor(hour), y=traffic_volume)) + labs(title="Hour vs Traffic Volume", x="Hour", y="Traffic Volume") + geom_boxplot()
 ```
 
-It appears that there is a trend with respect to the hour. During hours in the middle of the day, consistently higher traffic volume values can be seen, while hours at night have lower traffic volume values. The lack of overlap between the distributions of traffic flow between hours, as well as the small span of some distributions suggest that this is a variable to consider when training our models.
+It appears that there is a trend with respect to the hour. During hours in the middle of the day, consistently higher traffic volume values can be seen, while hours at night have lower traffic volume values. The lack of overlap between the distributions of traffic flow between hours, as well as the small span of some distributions suggests that this is a variable to consider when training our models.
 
 We can also analyze the relationship between other variables (temperature, etc) with respect to the traffic volume while holding the hour constant.
 
@@ -199,7 +200,7 @@ df2_hour12 <- subset(df2, hour==12)
 plot(df2_hour12$temp, df2_hour12$traffic_volume, main="Temperature vs Traffic Volume (12pm)", xlab="Temperature", ylab="Traffic Volume", pch=20)
 ```
 
-Variables such as temperature, can be seen to be positively strongly correlated when holding the hour constant. Thus, a supervised learning algorithm trained on multiple predictor variables should be improved with the inclusion of the hour variable.
+Variables such as temperature can be seen to be positively strongly correlated when holding the hour constant. Thus, a supervised learning algorithm trained on multiple predictor variables should be improved with the inclusion of the hour variable.
 
 ### Modeling Approach
 
@@ -217,7 +218,7 @@ The data appears roughly even between light and medium traffic, with fewer heavy
 
 #### Preprocess the data (normalize)
 
-Before we create a classifier model such as K Nearest Neighbors, it is important that we normalize the data. Normalizing the data for KNN is imperative because KNN relies on Euclidean distance to determine the closest points; without normalization, variables with lower variance would be interpreted as closer, resulting in a biased estimation. Let"s create a normalize() function that will normalize a variable using min-max scaling. We can use lapply to apply this function to each varaible in the data frame that we need normalized. Let"s create a new data frame with this processed data that we will use for the machine learning algorithms.
+Before we create a classifier model such as K Nearest Neighbors, it is important that we normalize the data. Normalizing the data for KNN is imperative because KNN relies on Euclidean distance to determine the closest points; without normalization, variables with lower variance would be interpreted as closer, resulting in a biased estimation. Let"s create a normalize() function that will normalize a variable using min-max scaling. We can use lapply to apply this function to each variable in the data frame that we need normalized. Let"s create a new data frame with this processed data that we will use for the machine learning algorithms.
 
 ```{r}
 df3 <- subset(df2, select=-c(holiday, weather_main, weather_description, year, month, day, time, date_time, traffic_volume, traffic))
@@ -233,7 +234,7 @@ processed_df$traffic <- df2$traffic
 
 #### Subset the data
 
-Using the set seed 123 for reproducibility, we can create a train test split. We can use a 90% training set and a 10% testing set as we have many data points and thus the testing set should be representative of the target we are trying to predict and not be affected by variation. This will allow us to later perform cross validation to analyze the effectiveness of our machine learning algorithms.
+Using the set seed 123 for reproducibility, we can create a train test split. We can use a 90% training set and a 10% testing set as we have many data points and thus the testing set should be representative of the target we are trying to predict and not be affected by variation. This will allow us to later perform cross-validation to analyze the effectiveness of our machine learning algorithms.
 
 ```{r}
 set.seed(123, sample.kind="Rounding")
@@ -244,7 +245,7 @@ testing_data <- processed_df[-train_index,] # testing data
 
 #### Model 1 - KNN 
 
-The K Nearest Neighbors algorithm classifies data given the level of the k nearest neighbors. Let us run this algorithm with all the predictors. Rather than using a single train/test split, we can use repeated k-fold cross validation through trainControl with 10 fold cross validation repeated 5 times.
+The K Nearest Neighbors algorithm classifies data given the level of the k nearest neighbors. Let us run this algorithm with all the predictors. Rather than using a single train/test split, we can use repeated k-fold cross-validation through trainControl with 10 fold cross-validation repeated 5 times.
 
 ```{r}
 model_1 <- train(traffic~., method="knn", trControl=trainControl(method="repeatedcv", number=5, repeats=10), data=training_data)
@@ -262,7 +263,7 @@ The confusion matrix shows that our model accuracy is relatively high.
 
 #### Model 2 - Decision Tree
 
-Our second model will be a decision tree based on recursive partitioning. We will use rpart2, which allows for the optimization of the tree depth. We will pass in a tunegrid parameter with a few values to optmize the tree depth.
+Our second model will be a decision tree based on recursive partitioning. We will use rpart2, which allows for the optimization of the tree depth. We will pass in a tunegrid parameter with a few values to optimize the tree depth.
 
 ```{r}
 tunegrid <- expand.grid(maxdepth=c(1, 3, 5, 7, 9, 11))
