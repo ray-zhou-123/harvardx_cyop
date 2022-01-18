@@ -1,0 +1,347 @@
+---
+title: "Capstone Project - Traffic Analysis"
+author: "Ray Z"
+date: "1/17/2022"
+output: pdf_document
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
+```
+
+# Capstone Project - Traffic Analysis
+
+## Introduction
+
+Consistent traffic flow is critical for commuters, travelers, businesses, and accurate metrics of this can be employed by government agencies to improve safety and efficiency in transportation networks. Traffic congestion incurs an opportunity cost among individuals who would otherwise be working; not to mention, it also increases vehicular emissions and degrades the environment. Traffic flow is subject to a variety of factors, including inclement weather, time of day, and the particular day of the year. Using machine learning techniques, we will predict traffic flow using a variety of factors.
+
+The data used in this report is the [Metro Interstate Traffic Volume Data Set](http://archive.ics.uci.edu/ml/datasets/Metro+Interstate+Traffic+Volume) from the UCI Machine Learning Repository. It contains 48,204 data points on hourly traffic from Minneapolis to St. Paul, MN on westbound I-94, including weather and holiday features, from 2012-2018. Factors/variables in the dataset include:
+
+1. Holiday
+  + categorical variable for US holidays
+2. Temperature
+  + numerical variable, measured in Kelvin
+3. Rain
+  + numerical variable, measured in millimeter
+4. Snow
+  + numerical variable, measured in millimeters
+5. Clouds
+  + numerical variable, percentage of cloud cover
+6. Weather
+  + categorical variable, with a few categories
+7. Weather Description
+  + categorical variable, short descriptor of weather
+8. Date/time
+  + numerical, ordinal in this context
+9. Traffic Volume
+  + numerical variable, number of cars
+
+The goal of this project is apply several classification models to the traffic data and evaluate their effectiveness using k-fold cross validation given a training and testing set. We will first perform exploratory data analysis, and clean the data. We will normalize the data, and then conduct machine learning algorithms, determining which technique is most accurate. Supervised machine learning algorithms that will be used for this classification problem include:
+
+1. K Nearest Neighbors
+2. Decision Tree
+3. Multinomial Logistic Regression
+4. Neural Networks
+
+
+## Methods/Analysis
+
+We will begin by loading and cleaning the data.
+
+### Data Loading
+
+```{r}
+# Load packages
+if(!require(tidyverse)) install.packages("tidyverse", repos="http://cran.us.r-project.org")
+if(!require(R.utils)) install.packages("R.utils", repos="http://cran.us.r-project.org")
+if(!require(e1071)) install.packages("e1071", repos="http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos="http://cran.us.r-project.org")
+if(!require(class)) install.packages("class", repos="http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("lubridate", repos="http://cran.us.r-project.org")
+library(R.utils)
+library(e1071)
+library(caret)
+library(class)
+library(lubridate)
+
+if(!file.exists("traffic.csv")){
+  download.file("https://archive.ics.uci.edu/ml/machine-learning-databases/00492/Metro_Interstate_Traffic_Volume.csv.gz", "traffic.csv.gz")
+  gunzip("traffic.csv.gz")
+}
+df<-read.csv("traffic.csv")
+
+```
+
+Let us first examine a few key aspects of the dataset.
+
+```{r}
+nrow(df)
+```
+
+```{r}
+head(df)
+```
+
+We can see the 9 columns, and 48204 total entries.
+
+### Exploratory Data Analysis and Data Cleaning
+
+Let us first generate some simple scatter plots between the numerical predictor variables and the dependent variable which we will be trying to predict (traffic_volume). We can also generate a box and whisker plot for the categorical variable weather_main.
+
+Temperature versus Traffic Volume
+```{r}
+plot(df$temp, df$traffic_volume, main="Temperature vs Traffic Volume", xlab="Temperature", ylab="Traffic Volume", col="red", pch=20)
+```
+
+Rain versus Traffic Volume
+```{r}
+plot(df$rain_1h, df$traffic_volume, main="Rain vs Traffic Volume", xlab="Rain in the Hour", ylab="Traffic Volume", col="blue", pch=20)
+```
+
+Snow versus Traffic Volume
+```{r}
+plot(df$snow_1h, df$traffic_volume, main="Snow vs Traffic Volume", xlab="Snow in the Hour", ylab="Traffic Volume", col="#ADD8E6", pch=20)
+```
+
+Clouds versus Traffic Volume
+```{r}
+plot(df$clouds_all, df$traffic_volume, main="Clouds vs Traffic Volume", xlab="Cloud Percentage", ylab="Traffic Volume", col="grey", pch=20)
+```
+
+Weather versus Traffic Volume
+```{r}
+ggplot(df, aes(x=weather_main, y=traffic_volume)) + labs(title="Weather vs Traffic Volume", x="Weather", y="Traffic Volume") + geom_boxplot(fill="yellow")
+```
+
+It appears that our scatterplots for temperature and rain are skewed by 11 outliers. These appear to be at temperature 0 kelvin, and one extremely high rain event ~10000mm (10 meters!). We can create a subset without these outliers, and examine them to ensure they are measurement errors and we are not discarding important data.
+
+```{r}
+df2 <- subset(df, temp>200 & rain_1h<1000)  # remove outliers (kelvin <200 and rain >1000)
+outliers <- subset(df, temp<200 | rain_1h>1000)  # examine outliers
+print(outliers)
+```
+
+As we can see, there are 11 outliers, 10 of which are at temperature 0 kelvin (which is unlikely to occur from natural conditions), while one has a rain measurement of 9831.3 mm, or 9.8 meters of rain (also unlikely to occur from natural conditions). Thus, we can use the dataframe with these outliers removed. Graphing the same plots with the outliers removed gives us the following graphs.
+
+Temperature versus Traffic Volume
+```{r}
+plot(df2$temp, df2$traffic_volume, main="Temperature vs Traffic Volume", xlab="Temperature", ylab="Traffic Volume", col="red", pch=20)
+```
+
+Rain versus Traffic Volume
+```{r}
+plot(df2$rain_1h, df2$traffic_volume, main="Rain vs Traffic Volume", xlab="Rain in the Hour", ylab="Traffic Volume", col="blue", pch=20)
+```
+
+Snow versus Traffic Volume
+```{r}
+plot(df2$snow_1h, df2$traffic_volume, main="Snow vs Traffic Volume", xlab="Snow in the Hour", ylab="Traffic Volume", col="#ADD8E6", pch=20)
+```
+
+Clouds versus Traffic Volume
+```{r}
+plot(df2$clouds_all, df2$traffic_volume, main="Clouds vs Traffic Volume", xlab="Cloud Percentage", ylab="Traffic Volume", col="grey", pch=20)
+```
+
+Weather versus Traffic Volume
+```{r}
+ggplot(df2, aes(x=weather_main, y=traffic_volume)) + labs(title="Weather vs Traffic Volume", x="Weather", y="Traffic Volume") + geom_boxplot(fill="yellow")
+```
+
+There does not appear to be any significant correlation of features so far. Let us visualize the data with respect for time. We must first parse the date_time column in the df2 data frame.
+```{r}
+df2$time <- parse_date_time(df2$date_time, "ymd HMS")
+df2$year <- df2$time %>% year()
+df2$month <- df2$time %>% month()
+df2$day <- df2$time %>% day()
+df2$hour <- df2$time %>% hour()
+```
+
+We can first examine the year to year variation.
+```{r}
+ggplot(df2, aes(x=as.factor(year), y=traffic_volume)) + labs(title="Year vs Traffic Volume", x="Year", y="Traffic Volume") + geom_boxplot()
+```
+
+There appears to be no significant variation in the distribution between years. We will run the algorithm over all the years to account for the whole dataset.
+
+We can also examine the month to month variation.
+```{r}
+ggplot(df2, aes(x=as.factor(month), y=traffic_volume)) + labs(title="Month vs Traffic Volume", x="Month", y="Traffic Volume") + geom_boxplot()
+```
+While there is some variation in traffic volume, the means and IQRs are too similar to suggest significant variation of traffic flow based on month. Let's leave this as is for now.
+
+We can also analyze the traffic flow with respect to the day of the month.
+```{r}
+ggplot(df2, aes(x=as.factor(day), y=traffic_volume)) + labs(title="Day vs Traffic Volume", x="Day", y="Traffic Volume") + geom_boxplot()
+```
+Again we see a little variation. It could be a possibility that certain days are associated with less traffic volume (for instance, the weekend). However, like the previous graph of month versus traffic volume, the mean and IQRs seem to fall close to one another, making this likely not a critical variable to classify traffic flow.
+
+It seems most likely that the traffic flow will change most with the hour of the day. Let's analyze traffic flow with respect to the hour.
+
+```{r}
+ggplot(df2, aes(x=as.factor(hour), y=traffic_volume)) + labs(title="Hour vs Traffic Volume", x="Hour", y="Traffic Volume") + geom_boxplot()
+```
+
+It appears that there is a trend with respect to the hour. During hours in the middle of the day, consistently higher traffic volume values can be seen, while hours at night have lower traffic volume values. The lack of overlap between the distributions of traffic flow between hours, as well as the small span of some distributions suggest that this is a variable to consider when training our models.
+
+We can also analyze the relationship between other variables (temperature, etc) with respect to the traffic volume while holding the hour constant.
+
+Temperature versus Traffic Volume at 3am
+```{r}
+df2_hour3 <- subset(df2, hour==3)
+plot(df2_hour3$temp, df2_hour3$traffic_volume, main="Temperature vs Traffic Volume (3am)", xlab="Temperature", ylab="Traffic Volume", pch=20)
+```
+
+Temperature versus traffic volume at 12pm
+```{r}
+df2_hour12 <- subset(df2, hour==12)
+plot(df2_hour12$temp, df2_hour12$traffic_volume, main="Temperature vs Traffic Volume (12pm)", xlab="Temperature", ylab="Traffic Volume", pch=20)
+```
+
+Variables such as temperature, can be seen to be positively strongly correlated when holding the hour constant. Thus, a supervised learning algorithm trained on multiple predictor variables should be improved with the inclusion of the hour variable.
+
+### Modeling Approach
+
+We will treat this as a classification problem, and categorize the traffic_volume column into a few distinct categories representative of the traffic strength. As the current traffic_flow values range from 0 to 7280, we can split this into three bins of width 2500. Our models will classify the traffic flow as one of these three categories, for light, medium, and heavy traffic.
+```{r}
+range(df2$traffic_volume)
+```
+We see that the traffic_volume ranges from 0 to 7280.
+
+```{r}
+df2$traffic <- cut(df2$traffic_volume, c(0,2500,5000,7500), labels=c("light", "medium", "heavy"), right=FALSE)
+barplot(prop.table(table(df2$traffic)))
+```
+The data appears roughly even between light and medium traffic, with fewer heavy traffic instances than light and medium.
+
+#### Preprocess the data (normalize)
+
+Before we create a classifier model such as K Nearest Neighbors, it is important that we normalize the data. Normalizing the data for KNN is imperative because KNN relies on Euclidean distance to determine the closest points; without normalization, variables with lower variance would be interpreted as closer, resulting in a biased estimation. Let"s create a normalize() function that will normalize a variable using min-max scaling. We can use lapply to apply this function to each varaible in the data frame that we need normalized. Let"s create a new data frame with this processed data that we will use for the machine learning algorithms.
+
+```{r}
+df3 <- subset(df2, select=-c(holiday, weather_main, weather_description, year, month, day, time, date_time, traffic_volume, traffic))
+
+normalize <- function(x){ # normalize using min-max scaling
+  ((x-min(x))/(max(x)-min(x)))
+}
+
+processed_df <- as.data.frame(lapply(df3, normalize))
+
+processed_df$traffic <- df2$traffic
+```
+
+#### Subset the data
+
+Using the set seed 123 for reproducibility, we can create a train test split. We can use a 90% training set and a 10% testing set as we have many data points and thus the testing set should be representative of the target we are trying to predict and not be affected by variation. This will allow us to later perform cross validation to analyze the effectiveness of our machine learning algorithms.
+
+```{r}
+set.seed(123, sample.kind="Rounding")
+train_index <- sample(1:nrow(processed_df), 0.9*nrow(processed_df))
+training_data <- processed_df[train_index,] # training data
+testing_data <- processed_df[-train_index,] # testing data
+```
+
+#### Model 1 - KNN 
+
+The K Nearest Neighbors algorithm classifies data given the level of the k nearest neighbors. Let us run this algorithm with all the predictors. Rather than using a single train/test split, we can use repeated k-fold cross validation through trainControl with 10 fold cross validation repeated 5 times.
+
+```{r}
+model_1 <- train(traffic~., method="knn", trControl=trainControl(method="repeatedcv", number=5, repeats=10), data=training_data)
+model_1
+```
+Now our K Nearest Neighbors model is trained with k=9, with the relatively high accuracy of 0.7874. Now we can apply this model to the test set to see the model accuracy.
+
+```{r}
+knn_pred <- predict(model_1, newdata=testing_data)
+cm_1 <- confusionMatrix(knn_pred, testing_data$traffic)
+cm_1
+model_1_accuracy <- cm_1$overall["Accuracy"]
+```
+The confusion matrix shows that our model accuracy is relatively high.
+
+#### Model 2 - Decision Tree
+
+Our second model will be a decision tree based on recursive partitioning. We will use rpart2, which allows for the optimization of the tree depth. We will pass in a tunegrid parameter with a few values to optmize the tree depth.
+
+```{r}
+tunegrid <- expand.grid(maxdepth=c(1, 3, 5, 7, 9, 11))
+
+model_2 <- train(traffic~., method="rpart2", trControl=trainControl(method="repeatedcv", number=5, repeats=10), tuneGrid=tunegrid, data=training_data)
+model_2
+```
+
+```{r}
+dt_pred <- predict(model_2, newdata=testing_data)
+cm_2 <- confusionMatrix(dt_pred, testing_data$traffic)
+cm_2
+model_2_accuracy <- cm_2$overall["Accuracy"]
+```
+
+This accuracy is higher than that of the K Nearest Neighbor algorithm.
+
+We can plot out the splits that the decision tree made, noting which variables were split at what point.
+
+```{r}
+plot(model_2$finalModel, uniform=TRUE,
+     main="Classification Tree")
+text(model_2$finalModel, all=TRUE, cex=.8)
+```
+
+It seems like the hour variable is very significant in classifying the traffic flow.
+
+#### Model 3 - Multinomial Regression
+
+This question is at its core a logistic regression problem. As the dependent variable in this case has multiple levels and is not binary, we can fit a multinomial logistic regression.
+
+```{r}
+model_3 <- train(traffic~., method="multinom", trControl=trainControl(method="repeatedcv", number=5, repeats=10), trace=FALSE, data=training_data)
+
+model_3
+```
+
+```{r}
+mn_pred <- predict(model_3, newdata=testing_data)
+cm_3 <- confusionMatrix(mn_pred, testing_data$traffic)
+cm_3
+model_3_accuracy <- cm_3$overall["Accuracy"]
+```
+The multinomial logarithmic regression performed not as well as KNN and DT.
+
+#### Model 4 - Neural Network
+
+We can use a simple feed-forward neural network with one hidden layer using the nnet method. This is less computationally advantageous than the previous algorithms, however, we will see how effectively it can make predictions on the test set. 
+
+<!-- This model takes 30+ minutes to run -->
+```{r}
+model_4 <- train(traffic~., method="nnet", trControl=trainControl(method="repeatedcv", number=5, repeats=10), trace=FALSE, data=training_data)
+model_4
+```
+
+```{r}
+nn_pred <- predict(model_4, newdata=testing_data)
+cm_4 <- confusionMatrix(nn_pred, testing_data$traffic)
+cm_4
+model_4_accuracy <- cm_4$overall["Accuracy"]
+```
+The Neural Network also performed well, similar to the K Nearest Neighbors algorithm and the Decision Tree. However, the computational complexity and runtime are significantly higher than the other algorithms.
+
+## Results
+
+The following are our model results.
+
+```{r}
+tab <- matrix(c(model_1_accuracy, model_2_accuracy, model_3_accuracy, model_4_accuracy), ncol = 1, byrow = TRUE)
+colnames(tab) <- "Accuracy"
+rownames(tab) <- c("K Nearest Neighbors", "Decision Tree", "Multinomial Regression", "Neural Network")
+tab <- as.table(tab)
+tab
+```
+
+A Decision Tree with 5 levels performed the highest, with K Nearest Neighbors and Neural Network close behind. Multinomial regression performed significantly worse. Accuracy is a simple metric of model performance, calculated as (true positives + true negatives)/number of elements. When one target classification outweighs the others, such as a disease with 99% negative population cases, a test that only returns negative would have a very high accuracy but not be useful. In our case, with almost equal categories of low, medium, and high traffic, accuracy is a useful metric of how well the model performs. A 5 level Decision Tree performed the highest by this metric.
+
+
+## Conclusions
+This project was a classification problem in which we classified traffic flow (a numerical value from 0 to 7280) into three categories (light, medium, and heavy) and predicted this using K Nearest Neighbors, Decision Tree, Multinomial Regression, and Neural Network algorithms. Out of the four supervised learning methods we selected, Decision Tree with 5 levels performed the best on the testing set. K Nearest Neighbors and Neural Network performed similarly well, with K Nearest Neighbors performing slightly better than the Neural Network. Multinomial regression performed significantly worse than these two. Overall, we were able to generate fairly accurate predictions of traffic volume based on five variables: temperature, rainfall, snowfall, cloud coverage, and hour of day.
+
+As aforementioned, predicting traffic volume is vital for all who use public roadways, including commuters, travelers, and businesses. Having this metric allows traffic to be better regulated for safety, efficiency, and environmental impact. This project could possibly have been limited by its scope. The Minneapolis-St. Paul, Minnesota area might be very distinct from other locations in the United States and the world due to its weather, vehicle options, driver characteristics, industries, and much more; an application of this model could overfit when applied to other geographical areas or simply due to random variance as the model follows the data too closely. Future work could examine this problem as a regression problem, predicting the exact traffic flow based on the variables and quantifying the error using MAE or RMSE. We also didn't delve much into the time aspect of the issue, in particular the holidays. This could be integer encoded or one hot encoded as a predictor variable to determine the traffic flow.
