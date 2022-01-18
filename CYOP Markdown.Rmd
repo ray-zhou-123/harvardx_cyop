@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo=TRUE, tidy.opts=list(width.cutoff=60), tidy=TRUE)
 
 ## Introduction
 
-Consistent traffic flow is critical for commuters, travelers, businesses, and accurate metrics of this can be employed by government agencies to improve safety and efficiency in transportation networks. Traffic congestion incurs an opportunity cost among individuals who would otherwise be working; not to mention, it also increases vehicular emissions and degrades the environment. Traffic flow is subject to a variety of factors, including inclement weather, time of day, and the particular day of the year. Using machine learning techniques, we will predict traffic flow using a variety of factors.
+Consistent traffic flow is critical for the physical and economical well being of commuters, travelers, and businesses. Accurate metrics of this can be employed by government agencies to improve safety and efficiency in transportation networks. Traffic congestion incurs an opportunity cost among individuals who would otherwise be working; not to mention, it also increases vehicular emissions and degrades the environment. Traffic flow is subject to a variety of factors, including inclement weather, time of day, and the particular day of the year. Using machine learning techniques, we will predict traffic flow using a variety of factors.
 
 The data used in this report is the [Metro Interstate Traffic Volume Data Set](http://archive.ics.uci.edu/ml/datasets/Metro+Interstate+Traffic+Volume) from the UCI Machine Learning Repository. It contains 48,204 data points on hourly traffic from Minneapolis to St. Paul, MN on westbound I-94, including weather and holiday features, from 2012-2018. Factors/variables in the dataset include:
 
